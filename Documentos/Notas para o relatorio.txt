@@ -1,0 +1,39 @@
+Acerca do desempate feito no ranking das equipas no calculo de ranks:
+
+"A classificação das equipas será reconstruída programaticamente para cada jornada, aplicando-se os critérios de desempate regulamentares da Liga Portugal (Artigo 17.º), priorizando a Diferença de Golos e o Número de Vitórias para estabilidade das métricas a meio da época."
+
+"Para a definição da posição classificativa em cada jornada, a arquitetura seguirá o disposto na alínea f) do regulamento de desempate da Liga Portugal. Durante a fase competitiva, a prioridade será dada aos indicadores acumulados de performance (Pontos, Diferença de Golos e Vitórias), garantindo que a variável Rank reflita o momento de forma real e não apenas desempates administrativos pontuais."
+-----------------------------------------------------------------------
+
+Acerca de tirar a época 16-17 do dataset:
+
+"A época 16-17 foi excluída do dataset final devido à ausência de métricas disciplinares (cartões), optando-se por manter a integridade e homogeneidade das features em detrimento do volume total da amostra."
+
+"A época 2016-2017 foi excluída da amostra final para garantir a integridade das variáveis disciplinares (cartões amarelos e vermelhos), assegurando que o modelo de aprendizagem automática utilize um conjunto de atributos homogéneo em todo o horizonte temporal do estudo."
+-----------------------------------------------------------------------
+
+Acerca do uso de uma API para obter jogos futuros:
+
+"Devido a mecanismos de anti-scraping agressivos (Cloudflare) implementados em portais desportivos modernos, a arquitetura do sistema foi desenhada para consumir dados diretamente de uma API RESTful oficial (football-data.org), garantindo alta fiabilidade temporal e estrutural na ingestão do calendário."
+-----------------------------------------------------------------------
+
+Acerca do Precision-Recall Curve do baseline:
+
+"A análise da Curva Precision-Recall evidenciou a assimetria na capacidade preditiva do modelo base. Enquanto a classe 'H' obteve a maior área sob a curva, refletindo a fiabilidade das variáveis relacionadas com a vantagem caseira e favoritismo, a classe 'D' apresentou uma quebra acentuada. Isto reflete a natureza estocástica (aleatória) do empate no futebol, que raramente é bem explicado apenas pela diferença pontual ou classificativa entre as equipas."
+-----------------------------------------------------------------------
+
+Acerca da otimização com optuna:
+
+"Durante a otimização em duas fases, observou-se uma transição na importância dos hiperparâmetros. Após a estabilização inicial do learning_rate, o gamma emergiuncomo o fator decisivo (responsável por 74% da variação do erro). Isto indica que, para garantir probabilidades bem calibradas face à natureza ruidosa do futebol, a regularização rigorosa (impedindo a criação de ramos marginais nas árvores de decisão) é o mecanismo mais eficaz para minimizar o Log Loss."
+-----------------------------------------------------------------------
+
+Acerca do calculo do ranking jogo a jogo e nao jornada a jornada:
+"Como há muitos jogos adiados na Liga Portuguesa, forçar um cálculo por 'Jornada' iria corromper a cronologia real do campeonato. Calcular a classificação exatamente antes do apito inicial usando timestamps garante que não há qualquer Data Leakage."
+
+"A abordagem jogo a jogo permite ao modelo captar as trocas de liderança temporárias ou quedas nos lugares de despromoção que ocorrem durante o fim de semana, o que afeta psicologicamente as equipas que jogam nos dias seguintes."
+
+-----------------------------------------------------------------------
+
+Ablation Study
+"A análise de Ablação revelou que métricas cumulativas de eventos raros, como os Cartões Vermelhos Totais, introduziam ruído no modelo sem ganhos preditivos, contrastando com métricas densas como os Cartões Amarelos, que serviram como uma boa 'proxy' para a intensidade tática da equipa. A remoção destas variáveis, juntamente com o ruído sazonal (WeatherSeason), permitiu otimizar o Log Loss para 0.94783, consolidando um modelo final mais leve, lógico e robusto."
+"Durante o Estudo de Ablação, verificou-se um fenómeno interessante de colinearidade. Variáveis como 'AwayPoints' apresentavam importância próxima de zero no gráfico de Gain do XGBoost, ofuscadas por métricas derivadas mais fortes como o 'PPG_Diff'. Contudo, a sua remoção resultava numa penalização do Log Loss. Isto indica que o XGBoost ainda utilizava as features em bruto ('Wins' e 'Points') para pequenas calibrações em nós terminais profundos. Em contraste, a remoção de variáveis provadas como ruidosas (Cartões Vermelhos cumulativos e número de Jogos Jogados) resultou na melhoria do Log Loss para 0.94783. Desta forma, o estudo de ablação seguiu o rigor métrico do erro logarítmico e não apenas a análise visual de importância."

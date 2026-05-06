@@ -1,0 +1,29 @@
+Slide 1:
+Boa tarde, o meu nome é André Ferreira e venho apresentar o ponto de situação do meu projeto de Licenciatura em Engenharia Computacional, sob a orientação do Professor Doutor Mário Antunes. O projeto consiste em um sistema de previsão probabilística para a Primeira Liga Portuguesa, usando uma arquitetura hibrida de machine learning.
+
+Slide 2:
+Um dos problemas à volta do desporto é a sua imprevisibilidade e o futebol não é exceção. Tentar prever quem ganha ou perde não tem grande valor analítico. E portanto sugiro, em vez de tentar advinhar quem ganha ou perde, criar um sistema de probabilidades calibradas dividida em duas fases: a fase pré-jogo, usando um modelo XGBoost, e a fase ao intervalo, usando Redes Neuronais.
+
+Slide 3:
+Em termos de gestão, adotámos uma metodologia Agile dividida em 4 fases. E como podemos ver no diagrama, a primeira e segunda fase já estão concluídas e neste momento encontramo-nos no inicio da terceira fase, que é o modelo ao intervalo. Também é possível ver que em relação às datas para cada fase, não estão alinhadas com o presente e se pudesse fazer novamente o diagrama adicionava mais tempo à Preparação de Dados, pois é fundamental para qualquer projeto de Machine Learning.
+
+Slide 4:
+Em relação à metodologia cientifica, o pipeline está dividido em 4 pilares. O Dataset, que consiste em 9 épocas, sendo 7 para teste e as últimas 2 para treino. Feature Engineering, que consiste em criar features como ranking na tabela, forma nos últimos 5 jogos, golos marcados e sofridos, etc, utilizando o dataset original. O XGBoost usando o Optuna para otimização e obter probabilidades calibradas. E Redes Neuronais em que combinaremos a probabilidade pré-jogo com o resultado ao intervalo.
+
+Slide 5:
+Em relação à otimização do modelo, foi usado o Optuna para minimizar o Log Loss e definiu o hiperparametro Gamma como mais importante, tendo 97% de importância, forçando o modelo a evitar certezas absolutas. Depois de otimizar com o Optuna foi feito um Ablation Study, que consiste em retirar features que não têm importância ou que têm pouca importância, para melhorar o modelo. Como podemos ver na tabela a melhoria é consistente nas duas métricas principais, Log Loss e Brier Score, assim como no Accuracy.
+
+Slide 6:
+Em relação à calibração, foi feito a curva de calibração e como podemos ver na linha vermelha, sendo o modelo sem otimização, está bastante descalibrado e longe da diagonal perfeita, o que também é visível no histograma abaixo que mostra o excesso de confiança e a pouca distribuição de probabilidades. Enquanto os outros dois modelos, já estão mais agarrados à diagonal perfeito, e no histograma uma maior distribuição das probabilidades.
+
+Slide 7 (caso meta):
+Neste slide é possível ver o modelo em prática, com as probabilidades dos próximos 11 jogos, que contêm os jogos da próxima jornada e também os jogos em atrasado.
+
+Slide 8:
+Estando o modelo pré-jogo calibrado e a devolver boas probabilidades, passamos ao modelo ao intervalo em que vai receber estas probabilidades e o resultado ao intervalo como features. As tarefas para as próximas semanas serão em desenhar a arquitetura da Rede Neuronal e treinar o modelo tendo o Log Loss em conta.
+
+Slide 9:
+A recolha de dados estatísticos relacionados à primeira parte do jogo, é a maior dificuldade, pois mesmo havendo APIs gratuitas que forneçam dados estatísticos, nem todas têm os dados divididos por partes, e quando têm são APIs pagas e mesmo assim podem não conter os dados para ligas pequenas como a de Portugal ou para épocas tão antigas. Ou maneira para além das APIs seria fazer web scraping de sites como flashscore ou sofascore, mas poderia levar meses até recolher todos os dados e também existe a probabilidade de ser constantemente negado o acesso fazendo demorar ainda mais a recolha. Como solução para este problema optamos por usar exclusivamente o resultado ao intervalo.
+
+Slide 10:
+Obrigado pela atenção. Alguma questão?

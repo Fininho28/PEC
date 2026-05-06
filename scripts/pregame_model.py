@@ -1,0 +1,169 @@
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import log_loss, accuracy_score
+
+# funçao para garantir que a soma das probabilidades seja 100%
+def normalize_probabilities(prob_home, prob_draw, prob_away):
+    h = round(prob_home * 100, 1)
+    d = round(prob_draw * 100, 1)
+    a = round(prob_away * 100, 1)
+    
+    sum = round(h + d + a, 1)
+    diff = round(100 - sum, 1)
+    
+    if diff != 0.0:
+        if h >= d and h >= a:
+            h = round(h + diff, 1)
+        elif d >= h and d >= a:
+            d = round(d + diff, 1)
+        else:
+            a = round(a + diff, 1)
+    
+    return h, d, a
+
+# carregar e preparar dados
+def load_and_prep_data(file_path):
+    print('Carregando e preparando os dados...')
+    df = pd.read_csv(file_path)
+    df = df.sort_values(by=['Date', 'Time', 'HomeTeam'], ascending=[True, True, True]).reset_index(drop=True)
+    
+    # features
+    features = [
+        'HomeRank', 'AwayRank', 'HomePoints', 'AwayPoints',
+        'HomeW', 'AwayW', 'HomeGD', 'AwayGD', 'HomeGP', 'AwayGP',
+        'Sum_HomeY', 'Sum_AwayY', 'Sum_HomeR', 'Sum_AwayR',
+        'Stadium', 'Home_L5_GS', 'Home_L5_GC', 'Home_L5_Form_Pts',
+        'Away_L5_GS', 'Away_L5_GC', 'Away_L5_Form_Pts',
+        'Rank_Diff', 'Form_Diff', 'GD_Diff', 'HomePPG', 'AwayPPG',
+        'PPG_Diff', 'HomeGDpg', 'AwayGDpg', 'GDpg_Diff', 'WeatherSeason'
+    ]
+    
+    # features para remover apos ablation study
+    features_to_remove = [
+        'WeatherSeason',
+        'Sum_AwayR', 'Sum_HomeR',
+        'AwayPoints', 'HomePoints',
+        'AwayW', 'HomeW'
+    ]
+    
+    features_reduced = [f for f in features if f not in features_to_remove]
+    
+    # separar os jogos que ja aconteceram dos futuros
+    df_played = df[df['FTR'].notna()].copy()
+    df_future = df[df['FTR'].isna()].copy()
+    
+    # transformar FTR em numerico
+    le = LabelEncoder()
+    df_played['FTR_num'] = le.fit_transform(df_played['FTR'])
+    
+    return df_played, df_future, features_reduced, le
+
+# treino do modelo
+def train_model(df_played, features_reduced, le):
+    print('Treinando o modelo pré jogo...')
+    
+    season_train = ['17-18', '18-19', '19-20', '20-21', '21-22', '22-23', '23-24']
+    season_test = ['24-25', '25-26']
+    
+    mask_train = df_played['Season'].isin(season_train)
+    mask_test  = df_played['Season'].isin(season_test)
+    
+    X_train, X_test = df_played.loc[mask_train, features_reduced], df_played.loc[mask_test, features_reduced]
+    y_train, y_test = df_played.loc[mask_train, 'FTR_num'], df_played.loc[mask_test, 'FTR_num']
+    
+    # hiperparametros obtidos pelo Optuna
+    model = xgb.XGBClassifier(
+        learning_rate=0.15126766673915848, 
+        max_depth=6, 
+        n_estimators=422, 
+        subsample=0.9371543391575077, 
+        colsample_bytree=0.9206831318413401, 
+        min_child_weight=6, 
+        gamma=3.3894775369915258, 
+        reg_lambda=0.01156311748437383, 
+        reg_alpha=0.2752277707681487,
+        objective="multi:softprob",
+        num_class=3,
+        random_state=42
+    )
+    
+    model.fit(X_train, y_train)
+    
+    #y_pred = model.predict(X_test)
+    #y_prob = model.predict_proba(X_test)
+    #print(f"-> Accuracy no Teste: {accuracy_score(y_test, y_pred):.4f}")
+    #print(f"-> Log Loss no Teste: {log_loss(y_test, y_prob):.4f}")
+    
+    return model
+
+# gerar dataset ao intervalo com as probabilidades
+def generate_halftime_dataset(model, df_played, features, le):
+    print('A criar dataset com as probabilidades para o modelo ao intervalo...')
+    
+    # obter probabilidades para todos os jogos antigos
+    X_all = df_played[features]
+    probs = model.predict_proba(X_all)
+    
+    # index de H, D, A
+    idx_H = list(le.classes_).index('H')
+    idx_D = list(le.classes_).index('D')
+    idx_A = list(le.classes_).index('A')
+    
+    # criar dataset
+    cols_to_keep = ['Date', 'Time', 'Season', 'HomeTeam', 'AwayTeam', 'HTHG', 'HTAG', 'FTR']
+    df_ht = df_played[cols_to_keep].copy()
+    
+    # inserir as probs em formato 0-1
+    df_ht['Pregame_Prob_H'] = probs[:, idx_H]
+    df_ht['Pregame_Prob_D'] = probs[:, idx_D]
+    df_ht['Pregame_Prob_A'] = probs[:, idx_A]
+    
+    # guardar csv
+    df_ht.to_csv("data/processed/HalftimeDataset.csv", index=False)
+    print(f'Dataset criado com sucesso.')
+    
+# prever jogos futuros
+def predict_future_matches(model, df_future, features_reduced, le):
+    print('Previsão próximos 9 jogos...')
+    
+    if len(df_future) == 0:
+        print('Não há jogos futuros no dataset.')
+        return
+    
+    X_future = df_future[features_reduced]
+    probs = model.predict_proba(X_future)
+    
+    # index de H, D, A
+    idx_H = list(le.classes_).index('H')
+    idx_D = list(le.classes_).index('D')
+    idx_A = list(le.classes_).index('A')
+    
+    for i in range(len(df_future)):
+        equipa_casa = df_future.iloc[i]['HomeTeam']
+        equipa_fora = df_future.iloc[i]['AwayTeam']
+        
+        p_home = probs[i][idx_H]
+        p_draw = probs[i][idx_D]
+        p_away = probs[i][idx_A]
+        
+        h_final, d_final, a_final = normalize_probabilities(p_home, p_draw, p_away)
+        
+        print(f"{equipa_casa}: {h_final:.1f}% - Empate: {d_final:.1f}% - {equipa_fora}: {a_final:.1f}%")
+        print("-" * 50)
+        
+        
+def main():
+    file_path = "data/processed/LigaPortugal17-26.csv"
+        
+    df_played, df_future, features_reduced, le = load_and_prep_data(file_path)
+        
+    final_model = train_model(df_played, features_reduced, le)
+    
+    generate_halftime_dataset(final_model, df_played, features_reduced, le)
+        
+    predict_future_matches(final_model, df_future, features_reduced, le)
+    
+if __name__ == "__main__":
+    main()
