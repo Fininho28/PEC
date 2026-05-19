@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import log_loss, accuracy_score
 
 # funçao para garantir que a soma das probabilidades seja 100%
 def normalize_probabilities(prob_home, prob_draw, prob_away):
@@ -58,20 +57,14 @@ def load_and_prep_data(file_path):
     le = LabelEncoder()
     df_played['FTR_num'] = le.fit_transform(df_played['FTR'])
     
-    return df_played, df_future, features_reduced, le
+    return df_played, df_future, features_reduced, le, features
 
 # treino do modelo
 def train_model(df_played, features_reduced, le):
     print('Treinando o modelo pré jogo...')
     
-    season_train = ['17-18', '18-19', '19-20', '20-21', '21-22', '22-23', '23-24']
-    season_test = ['24-25', '25-26']
-    
-    mask_train = df_played['Season'].isin(season_train)
-    mask_test  = df_played['Season'].isin(season_test)
-    
-    X_train, X_test = df_played.loc[mask_train, features_reduced], df_played.loc[mask_test, features_reduced]
-    y_train, y_test = df_played.loc[mask_train, 'FTR_num'], df_played.loc[mask_test, 'FTR_num']
+    X_train = df_played[features_reduced]
+    y_train = df_played['FTR_num']
     
     # hiperparametros obtidos pelo Optuna
     model = xgb.XGBClassifier(
@@ -91,13 +84,36 @@ def train_model(df_played, features_reduced, le):
     
     model.fit(X_train, y_train)
     
-    #y_pred = model.predict(X_test)
-    #y_prob = model.predict_proba(X_test)
-    #print(f"-> Accuracy no Teste: {accuracy_score(y_test, y_pred):.4f}")
-    #print(f"-> Log Loss no Teste: {log_loss(y_test, y_prob):.4f}")
-    
     return model
 
+# modelo 2 classes
+def train_model_binary(df_played, features):
+    
+    df_binary = df_played[df_played['FTR'] != 'D'].copy()
+    
+    le_bin = LabelEncoder()
+    df_binary['FTR_num_bin'] = le_bin.fit_transform(df_binary['FTR'])
+    
+    X_train = df_binary[features]
+    y_train = df_binary['FTR_num_bin']
+    
+    model = xgb.XGBClassifier(
+        random_state=42, 
+        objective="binary:logistic",
+        learning_rate=0.04635632211048546, 
+        max_depth=3, n_estimators=678, 
+        subsample=0.4995243416931511, 
+        colsample_bytree=0.5426490676090604, 
+        min_child_weight=6, 
+        gamma=5.2047737369795435, 
+        reg_lambda=0.3751488469606916, 
+        reg_alpha=0.18389140874211948
+    )
+    
+    model.fit(X_train, y_train)
+    
+    return model, le_bin
+'''
 # gerar dataset ao intervalo com as probabilidades
 def generate_halftime_dataset(model, df_played, features, le):
     print('A criar dataset com as probabilidades para o modelo ao intervalo...')
@@ -123,9 +139,10 @@ def generate_halftime_dataset(model, df_played, features, le):
     # guardar csv
     df_ht.to_csv("data/processed/HalftimeDataset.csv", index=False)
     print(f'Dataset criado com sucesso.')
-    
+'''
+
 # prever jogos futuros
-def predict_future_matches(model, df_future, features_reduced, le):
+def predict_future_matches(model, model_binary, df_future, features_reduced, le, le_bin, features):
     print('Previsão próximos 9 jogos...')
     
     if len(df_future) == 0:
@@ -134,11 +151,15 @@ def predict_future_matches(model, df_future, features_reduced, le):
     
     X_future = df_future[features_reduced]
     probs = model.predict_proba(X_future)
+    probs_binary = model_binary.predict_proba(df_future[features])
     
     # index de H, D, A
     idx_H = list(le.classes_).index('H')
     idx_D = list(le.classes_).index('D')
     idx_A = list(le.classes_).index('A')
+    
+    idx_H_bin = list(le_bin.classes_).index('H')
+    idx_A_bin = list(le_bin.classes_).index('A')
     
     for i in range(len(df_future)):
         equipa_casa = df_future.iloc[i]['HomeTeam']
@@ -148,22 +169,27 @@ def predict_future_matches(model, df_future, features_reduced, le):
         p_draw = probs[i][idx_D]
         p_away = probs[i][idx_A]
         
+        p_home_b = probs_binary[i][idx_H_bin] * 100
+        p_away_b = probs_binary[i][idx_A_bin] * 100
+        
         h_final, d_final, a_final = normalize_probabilities(p_home, p_draw, p_away)
         
         print(f"{equipa_casa}: {h_final:.1f}% - Empate: {d_final:.1f}% - {equipa_fora}: {a_final:.1f}%")
+        print(f"{equipa_casa}: {p_home_b:>4.1f}% - {equipa_fora}: {p_away_b:>4.1f}%")
         print("-" * 50)
         
         
 def main():
     file_path = "data/processed/LigaPortugal17-26.csv"
         
-    df_played, df_future, features_reduced, le = load_and_prep_data(file_path)
+    df_played, df_future, features_reduced, le, features = load_and_prep_data(file_path)
         
     final_model = train_model(df_played, features_reduced, le)
+    final_model_binary, le_bin = train_model_binary(df_played, features)
     
-    generate_halftime_dataset(final_model, df_played, features_reduced, le)
+    #generate_halftime_dataset(final_model, df_played, features_reduced, le)
         
-    predict_future_matches(final_model, df_future, features_reduced, le)
+    predict_future_matches(final_model, final_model_binary, df_future, features_reduced, le, le_bin, features)
     
 if __name__ == "__main__":
     main()

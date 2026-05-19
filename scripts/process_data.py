@@ -177,7 +177,7 @@ def calc_standings(path_raw):
     df_final = pd.concat(all_data, ignore_index=True)
     df_final['Stadium'], _ = pd.factorize(df_final['HomeTeam'])
     
-    # ordenar pela data e hora de jogo de houver, e em caso de empate alfabeticamente pela equipa da casa
+    # ordenar pela data e hora de jogo se houver, e em caso de empate alfabeticamente pela equipa da casa
     if 'Datetime' in df_final.columns:
         df_final['Datetime'] = df_final['Datetime'].fillna(df_final['Date']) # preencher datetimes vazios com a coluna Date
         df_final = df_final.sort_values(by=['Datetime', 'HomeTeam'], ascending=False)
