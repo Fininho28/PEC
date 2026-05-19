@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 .vscode
+notebooks/halftime_test.ipynb
+data/processed/half_time_result.csv
+data/processed/HalftimeDataset.csv
+scripts/ht_match.py
