@@ -2,8 +2,17 @@ import requests
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_future_matches(api_key):
+    
+    if not api_key:
+        print("Erro: Nenhuma API Key foi fornecida.")
+        return None
+    
     url = "https://api.football-data.org/v4/competitions/PPL/matches?status=SCHEDULED"
     
     headers = {
@@ -79,7 +88,8 @@ def get_future_matches(api_key):
     return df
     
 def main():
-    df = get_future_matches("406db38d29bc42b0b72d3f826ecd9866")
+    api_key = os.getenv("FOOTBALL_API_KEY")
+    df = get_future_matches(api_key)
     
     if df is not None:
         file_path = Path("data/raw/LigaPortugal25-26.csv")
