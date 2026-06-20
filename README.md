@@ -1,4 +1,4 @@
-# Predictive Modeling in Liga Portugal: 2-Class and 3-Class XGBoost ⚽📊
+# Predictive Modeling in Liga Portugal ⚽📊
 
 Source code repository and data processing pipeline designed to predict Portuguese Primeira Liga match outcomes using XGBoost.
 
